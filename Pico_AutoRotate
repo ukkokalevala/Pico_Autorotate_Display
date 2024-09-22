@@ -1,0 +1,78 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define OLED_RESET    -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define OLED_I2C_ADDRESS 0x3C // Common I2C address for the OLED
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+Adafruit_MPU6050 mpu;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize OLED display
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+
+  // Initialize MPU6050
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 not found");
+    while (1);
+  }
+  
+  // Set up accelerometer range
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+}
+
+void loop() {
+  // Get accelerometer data
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  // Calculate the tilt angle from the accelerometer
+  float angle = atan2(a.acceleration.y, a.acceleration.x) * 180 / PI;
+
+  // Adjust the angle for display orientation
+  if (angle < 0) {
+    angle += 360;
+  }
+
+  // Set display rotation based on the tilt angle
+  if (angle > 45 && angle < 135) {
+    display.setRotation(1);  // 90 degrees
+  } else if (angle > 135 && angle < 225) {
+    display.setRotation(2);  // 180 degrees
+  } else if (angle > 225 && angle < 315) {
+    display.setRotation(3);  // 270 degrees
+  } else {
+    display.setRotation(0);  // 0 degrees (default)
+  }
+
+  display.clearDisplay();
+  
+  // Display some text
+  display.setCursor(0, 0);
+  display.println("MPU6050 Auto-Rotate");
+  display.println("Tilt Angle:");
+  display.print(angle);
+  display.println(" deg");
+  
+  display.display();
+
+  delay(500);  // Delay for smoother rotation
+}
